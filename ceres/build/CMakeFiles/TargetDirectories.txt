@@ -1,1 +1,0 @@
-/home/jinyao/Documents/my_projects/ceres/build/CMakeFiles/main.dir

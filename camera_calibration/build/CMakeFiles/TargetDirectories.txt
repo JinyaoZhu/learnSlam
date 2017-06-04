@@ -1,2 +1,0 @@
-/home/jinyao/Documents/my_projects/camera_calibration/build/src/CMakeFiles/myslam.dir
-/home/jinyao/Documents/my_projects/camera_calibration/build/test/CMakeFiles/test1.dir
