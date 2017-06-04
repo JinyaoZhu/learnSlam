@@ -1,0 +1,1 @@
+/home/jinyao/Documents/my_projects/resize/build/CMakeFiles/resize.dir

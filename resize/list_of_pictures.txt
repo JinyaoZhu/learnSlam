@@ -1,0 +1,3 @@
+/home/jinyao/Documents/my_projects/resize/data/IMGP5573.JPG
+/home/jinyao/Documents/my_projects/resize/data/IMGP5574.JPG
+/home/jinyao/Documents/my_projects/resize/data/IMGP5575.JPG

@@ -1,0 +1,6 @@
+ios = 1600
+sutter = 1/30
+F4.0
+MF
+18mm
+square size = 0.029m
