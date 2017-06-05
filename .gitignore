@@ -1,6 +1,6 @@
-**/build/
+**/build
 *.kdev4
 **/output
 **/data
-**/bin/
+**/bin
 
