@@ -157,9 +157,7 @@ int main( int argc, char** argv )
     detector->detect(curr_img_grey,corners);
             
     for(int i=0; i<corners.size();i++)
-    {
       keypoints.push_back(corners[i].pt);
-    }
     
       
     //first frame
@@ -188,7 +186,7 @@ int main( int argc, char** argv )
 // 		  curr_img_grey.ptr<uchar>(y)[x+1] - curr_img_grey.ptr<uchar>(y)[x-1], 
 // 		  curr_img_grey.ptr<uchar>(y+1)[x] - curr_img_grey.ptr<uchar>(y-1)[x]
 // 	      );
-// 	      if ( delta.norm() < 50 )
+// 	      if ( delta.norm() < 80 )
 // 		  continue;
 // 	      keypoints.push_back(cv::Point2f(x,y));
 // 	      ushort d = img_depth.ptr<ushort> ( cvRound ( y ) ) [ cvRound ( x ) ];
@@ -200,14 +198,14 @@ int main( int argc, char** argv )
 // 	      float grayscale = float ( curr_img_grey.ptr<uchar> (y) [x] );
 // 	      last_measurements.push_back ( Measurement ( p3d, grayscale ) );
 // 	  }
-//       continue;
+      continue;
      }
     
-    Eigen::Isometry3d Tcw = Eigen::Isometry3d::Identity();
+    Eigen::Isometry3d T_cr = Eigen::Isometry3d::Identity();
     Eigen::Matrix3f K;
     cv::cv2eigen(camera_matrix,K);
     
-    poseEstimationDirect (last_measurements, &curr_img_grey, K, Tcw);
+    poseEstimationDirect (last_measurements, &curr_img_grey, K, T_cr);
     
     //update measurements
     last_measurements.clear();
@@ -225,16 +223,16 @@ int main( int argc, char** argv )
 	float grayscale = float ( curr_img_grey.ptr<uchar> ( cvRound ( kp.y ) ) [ cvRound ( kp.x ) ] );
 	last_measurements.push_back ( Measurement ( p3d, grayscale ) );
     }
-//     for ( int x=10; x<curr_img_grey.cols-10; x++ )
-// 	for ( int y=10; y<curr_img_grey.rows-10; y++ )
+//     for ( int x=10; x<curr_img_grey.cols-10; x+=1 )
+// 	for ( int y=10; y<curr_img_grey.rows-10; y+=1 )
 // 	{
 // 	    Eigen::Vector2d delta (
 // 		curr_img_grey.ptr<uchar>(y)[x+1] - curr_img_grey.ptr<uchar>(y)[x-1], 
 // 		curr_img_grey.ptr<uchar>(y+1)[x] - curr_img_grey.ptr<uchar>(y-1)[x]
 // 	    );
-// 	    if ( delta.norm() < 100 )
+// 	    if ( delta.norm() < 80 )
 // 		continue;
-// 	    
+// 	   	    
 // 	    keypoints.push_back(cv::Point2f(x,y));
 // 	    ushort d = img_depth.ptr<ushort> ( cvRound ( y ) ) [ cvRound ( x ) ];
 // 	    if ( d==0 )
@@ -251,17 +249,17 @@ int main( int argc, char** argv )
     
     cv::Mat R,t;
     
-    Eigen::Matrix4d Tcw_m = Tcw.matrix();
+    Eigen::Matrix4d T_cr_m = T_cr.matrix();
     
     Eigen::Matrix<double,3,3>  R_;
-      R_(0,0) = Tcw_m(0,0);R_(0,1) = Tcw_m(0,1);R_(0,2) = Tcw_m(0,2);
-      R_(1,0) = Tcw_m(1,0);R_(1,1) = Tcw_m(1,1);R_(1,2) = Tcw_m(1,2);
-      R_(2,0) = Tcw_m(2,0);R_(2,1) = Tcw_m(2,1);R_(2,2) = Tcw_m(2,2);
+      R_(0,0) = T_cr_m(0,0);R_(0,1) = T_cr_m(0,1);R_(0,2) = T_cr_m(0,2);
+      R_(1,0) = T_cr_m(1,0);R_(1,1) = T_cr_m(1,1);R_(1,2) = T_cr_m(1,2);
+      R_(2,0) = T_cr_m(2,0);R_(2,1) = T_cr_m(2,1);R_(2,2) = T_cr_m(2,2);
       
    Eigen::Matrix<double,3,1> t_;
-   t_(0,0) = Tcw_m(0,3);
-   t_(1,0) = Tcw_m(1,3);
-   t_(2,0) = Tcw_m(2,3);
+   t_(0,0) = T_cr_m(0,3);
+   t_(1,0) = T_cr_m(1,3);
+   t_(2,0) = T_cr_m(2,3);
    
    cv::eigen2cv(R_,R);
    cv::eigen2cv(t_,t);
@@ -271,21 +269,19 @@ int main( int argc, char** argv )
     cv::Mat img_show = curr_img_color.clone();
     
     for(auto kp:keypoints){
-      cv::circle(img_show,kp,5,cv::Scalar(0,240,0),1);
+      cv::circle(img_show,kp,2,cv::Scalar(0,240,0),1);
     }
     
     cv::imshow("corners",img_show);
     
-   
-      // show the map and the camera pose 
+  
+      Eigen::Matrix4d T_show = Eigen::Matrix4d::Identity();
       
-
+      static Eigen::Matrix4d T_cw = Eigen::Matrix4d::Identity();
       
-      //Eigen::Matrix<double,3,3> R_ = Eigen::AngleAxis<double>(M_PI/4,Eigen::Vector3d(0,0,1)).toRotationMatrix();
-
-      static Eigen::Matrix4d T_show = Eigen::Matrix4d::Identity();
+      T_cw = T_cr_m*T_cw;
       
-      T_show = Tcw_m.inverse()*T_show;
+      T_show = T_cw.inverse();
       
       cv::Mat_<double> R_show(3,3);
       cv::Mat_<double> t_show(3,1);
@@ -306,7 +302,7 @@ int main( int argc, char** argv )
       cv::waitKey(1);
     }
   
-
+  cv::waitKey(0);
   return 0;
 }
 

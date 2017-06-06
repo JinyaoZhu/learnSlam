@@ -35,14 +35,14 @@ void bundleAdjustment (
         g2o::VertexSBAPointXYZ* point = new g2o::VertexSBAPointXYZ();
         point->setId ( index++ );
         point->setEstimate ( Eigen::Vector3d ( p.x, p.y, p.z ) );
-        point->setMarginalized ( true ); // g2o 中必须设置 marg 参见第十讲内容
+        point->setMarginalized ( true ); 
         optimizer.addVertex ( point );
     }
 
     // parameter: camera intrinsics
     g2o::CameraParameters* camera = new g2o::CameraParameters (
-        K.at<double> ( 0,0 ), Eigen::Vector2d ( K.at<double> ( 0,2 ), K.at<double> ( 1,2 ) ), 0
-    );
+        K.at<double> ( 0,0 ), Eigen::Vector2d ( K.at<double> ( 0,2 ), K.at<double> ( 1,2 ) ), 0);
+    
     camera->setId ( 0 );
     optimizer.addParameter ( camera );
 
@@ -182,6 +182,9 @@ bool poseEstimationDirect ( const vector< Measurement >& measurements, cv::Mat* 
         edge->setMeasurement ( m.grayscale );
         edge->setInformation ( Eigen::Matrix<double,1,1>::Identity() );
         edge->setId ( id++ );
+	g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
+        rk->setDelta(1.0);
+        edge->setRobustKernel(rk);
         optimizer.addEdge ( edge );
     }
     cout<<"edges in graph: "<<optimizer.edges().size() <<endl;
