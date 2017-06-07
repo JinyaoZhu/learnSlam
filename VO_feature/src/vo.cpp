@@ -4,22 +4,37 @@
 #include <opencv2/calib3d/calib3d.hpp>
 
 #include "myslam/g2o_type.h"
+#include "myslam/config.h"
 
 #include "boost/timer.hpp"
+#include <sys/stat.h>
 
 namespace myslam {
   
 VO::VO():state_(INITIALIZE),map_(new Map()),ref_(nullptr),
-curr_(nullptr), num_inliers_(0), num_lost_(0)
-{
-  detector_ = cv::ORB::create ( 600, 1.1f, 8 );
-  matcher_ =  cv::DescriptorMatcher::create ( "BruteForce-Hamming" );;
+curr_(nullptr), num_inliers_(0), num_lost_(0) //,matcher_(new cv::flann::LshIndexParams ( 5,10,2 ))
+{  
+  num_of_features_ = Config::get<int>("num_of_features");
+  orb_sacle_factor_ = Config::get<double>("orb_sacle_factor");
+  orb_level_pyramid_ = Config::get<int>("orb_level_pyramid");
+  min_match_ratio_ = Config::get<double>("min_match_ratio");
+  max_num_lost_ = Config::get<int>("max_num_lost");
+  min_inliers_rate_ = Config::get<int>("min_inliers_rate");
+  max_map_points_ = Config::get<int>("max_map_points");
+  
+  frame_max_rot_ = Config::get<int>("frame_max_rot");
+  frame_max_trans_ = Config::get<int>("frame_max_trans");
+  
+  
+  detector_ = cv::ORB::create ( num_of_features_,orb_sacle_factor_,orb_level_pyramid_);
+  matcher_ =  cv::DescriptorMatcher::create ( "BruteForce-Hamming" );
 }
   
   
 bool VO::addFrame(Frame::Ptr frame)
 {
   curr_ = frame;
+  cout << "map points size:"<<map_->map_points_.size()<<endl;
   switch(state_)
   {
   case INITIALIZE:
@@ -39,17 +54,42 @@ bool VO::addFrame(Frame::Ptr frame)
     computeDescriptors();
     featureMatching();
     poseEstimatePnP();
-    curr_->T_c_w_ = T_c_w_estimated_;
-    
-    optimizeMap();
-    ref_ = curr_;
+    if(checkEstimatedPose() == true)
+    {
+      curr_->T_c_w_ = T_c_w_estimated_;
+      optimizeMap();
+      ref_ = curr_;
+      num_lost_ = 0;
+    }
+    else
+    {
+      //cv::waitKey(0);
+      num_lost_++;
+      if(num_lost_ > max_num_lost_)
+	state_ = LOST;
+    }
     break;
   }
   case LOST:
   {
+    cout<<"I am lost!"<<endl;
+    extractKeyPoints();
+    computeDescriptors();
+    featureMatching();
+    poseEstimatePnP();
+    if(checkEstimatedPose() == true)
+    {
+      state_ = OK;
+      curr_->T_c_w_ = T_c_w_estimated_;
+      ref_ = curr_;
+    }
     break;
   }
 }
+if(state_ != LOST)
+return true;
+else
+  return false;
 }
 
   
@@ -81,15 +121,21 @@ void VO::featureMatching()
   for(auto & allpoints:map_->map_points_)
   {
     MapPoint::Ptr & p = allpoints.second;
-    if(curr_->isInFrame(p->pos_))
+    if(curr_->isInFrame(p->pos_) && state_!= LOST)
     {
       //add candidates
       p->visible_times_++;
       map_candidates.push_back(p);
       candidates_descriptor.push_back(p->descriptor_);
     }
+    else
+    {
+      map_candidates.push_back(p);
+      candidates_descriptor.push_back(p->descriptor_);
+    }
+    
   }
-  cout<<"candidates size:"<<map_candidates.size()<<endl;
+//  cout<<"candidates size:"<<map_candidates.size()<<endl;
   matcher_->match(candidates_descriptor,descriptor_curr_,matches);
   
   //select good matches
@@ -102,7 +148,7 @@ void VO::featureMatching()
     matched_2d_kp_index_.clear();
     for(cv::DMatch &m:matches)
     {
-      if(m.distance < max<float>(min_dis*2,20))
+      if(m.distance < max<float>(min_dis*2,30))
       {
 	matched_3d_points_.push_back(map_candidates[m.queryIdx]);
 	matched_2d_kp_index_.push_back(m.trainIdx);
@@ -127,9 +173,15 @@ void VO::poseEstimatePnP()
   
   cv::Mat rvec,tvec,inliers;
   cv::solvePnPRansac(pts_3d,pts_2d,curr_->camera_->matrix_,
-   curr_->camera_->distor_,rvec,tvec,false,100,4.0,0.99,inliers);
-  
+   curr_->camera_->distor_,rvec,tvec,false,100,8.0,0.99,inliers);
+   
   num_inliers_ = inliers.rows;
+  
+//  cout<<"inliers rate:"<<(double)num_inliers_/pts_3d.size()<<endl;
+  
+  // too few inliners
+  if((double)num_inliers_/matched_3d_points_.size() < min_inliers_rate_)
+    return;
   
   for(int i=0; i<inliers.rows; i++)
   {
@@ -137,12 +189,12 @@ void VO::poseEstimatePnP()
      matched_3d_points_[index]->matched_times_ ++;
   }
   
-//  cout<<"inliers size:"<<num_inliers_<<endl;
+
   
   T_c_w_estimated_ = Sophus::SE3 (Sophus::SO3( rvec.at<double> ( 0,0 ), rvec.at<double> ( 1,0 ), rvec.at<double> ( 2,0 ) ),
                            Eigen::Vector3d ( tvec.at<double> ( 0,0 ), tvec.at<double> ( 1,0 ), tvec.at<double> ( 2,0 ) ) );
   
-// using bundle adjustment to optimize the pose
+     // using bundle adjustment to optimize the pose
     typedef g2o::BlockSolver<g2o::BlockSolverTraits<6,2>> Block;
     Block::LinearSolverType* linearSolver = new g2o::LinearSolverDense<Block::PoseMatrixType>();
     Block* solver_ptr = new Block ( linearSolver );
@@ -160,7 +212,7 @@ void VO::poseEstimatePnP()
     // edges
     for ( int i=0; i<inliers.rows; i++ )
     {
-        int index = inliers.at<int> ( i,0 );
+        int index = inliers.at<int>( i,0 );
         // 3D -> 2D projection
         EdgeProjectXYZ2UVPoseOnly* edge = new EdgeProjectXYZ2UVPoseOnly();
         edge->setId ( i );
@@ -170,18 +222,88 @@ void VO::poseEstimatePnP()
         edge->setMeasurement ( Eigen::Vector2d ( pts_2d[index].x, pts_2d[index].y ) );
         edge->setInformation ( Eigen::Matrix2d::Identity() );
 	g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
-        rk->setDelta(1.0);
+        rk->setDelta(15.0);
         edge->setRobustKernel(rk);
         optimizer.addEdge ( edge );
     }
 
     optimizer.initializeOptimization();
-    optimizer.optimize ( 10 );
+    optimizer.optimize ( 50 );
 
     T_c_w_estimated_ = Sophus::SE3 (
         pose->estimate().rotation(),
         pose->estimate().translation()
     );
+  
+//     typedef g2o::BlockSolver< g2o::BlockSolverTraits<6,3> > Block;  
+//     Block::LinearSolverType* linearSolver = new g2o::LinearSolverCSparse<Block::PoseMatrixType>(); 
+//     Block* solver_ptr = new Block ( linearSolver );    
+//     g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg ( solver_ptr );
+//     g2o::SparseOptimizer optimizer;
+//     optimizer.setAlgorithm ( solver );
+// 
+//     // vertex
+//     g2o::VertexSE3Expmap* pose = new g2o::VertexSE3Expmap(); // camera pose
+// 
+//     pose->setId ( 0 );
+//     pose->setEstimate ( g2o::SE3Quat (T_c_w_estimated_.rotation_matrix(), T_c_w_estimated_.translation()) );
+//     
+//     optimizer.addVertex ( pose );
+// 
+//     
+//     vector<g2o::VertexSBAPointXYZ*> point;
+//     
+//     for(int i=0;i<inliers.rows;i++)
+//       point.push_back(new g2o::VertexSBAPointXYZ());
+//     
+//     // landmarks
+//     for ( int i=0; i<inliers.rows; i++ )
+//     {
+//       int index = inliers.at<int>( i,0 );
+//       point[i]->setId ( i + 1 );
+//       point[i]->setEstimate ( Eigen::Vector3d ( pts_3d[index].x, pts_3d[index].y, pts_3d[index].z ) );
+//       point[i]->setMarginalized ( true ); // g2o 中必须设置 marg 参见第十讲内容
+//       optimizer.addVertex ( point[i]);
+//     }
+// 
+//     // parameter: camera intrinsics
+//     g2o::CameraParameters* camera = new g2o::CameraParameters (
+//         curr_->camera_->fx_, Eigen::Vector2d( curr_->camera_->cx_, curr_->camera_->cy_), 0);
+//     camera->setId ( 0 );
+//     optimizer.addParameter ( camera );
+// 
+//     // edges
+//     for ( int i=0; i<inliers.rows; i++ )
+//     {
+//         int index = inliers.at<int>( i,0 );
+//         g2o::EdgeProjectXYZ2UV* edge = new g2o::EdgeProjectXYZ2UV();
+//         edge->setId ( i );
+//         edge->setVertex ( 0, dynamic_cast<g2o::VertexSBAPointXYZ*> ( optimizer.vertex ( i+1 ) ) );
+//         edge->setVertex ( 1, pose );
+//         edge->setMeasurement (  Eigen::Vector2d ( pts_2d[index].x, pts_2d[index].y ) );
+//         edge->setParameterId ( 0,0 );
+//         edge->setInformation ( Eigen::Matrix2d::Identity() );
+// 	g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
+//         rk->setDelta(1.0);
+//         edge->setRobustKernel(rk);
+//         optimizer.addEdge ( edge );
+//     }
+//    
+// 
+//     optimizer.setVerbose ( false );
+//     optimizer.initializeOptimization();
+//     optimizer.optimize ( 100 );
+//     T_c_w_estimated_ = Sophus::SE3 (
+//         pose->estimate().rotation(),
+//         pose->estimate().translation()
+//     );
+//     
+// 
+//     for ( int i=0; i<inliers.rows; i++ )
+//     {
+//       int index = inliers.at<int>( i,0 );
+//       matched_3d_points_[index]->pos_ = point[i]->estimate();
+//     }
     
 //    cout << "poseEstimatePnP() cost time:"<<timer.elapsed()<<endl;
 }
@@ -189,7 +311,6 @@ void VO::poseEstimatePnP()
 void VO::addKeyFrame()
 {
   map_->insertKeyFrame(curr_);
-  ref_ = curr_;
 }
 
 void VO::addMapPoints()
@@ -212,18 +333,18 @@ void VO::addMapPoints()
     
     map_->insertMapPoint(map_point);
   }
-  cout << "map points size:"<<map_->map_points_.size()<<endl;
+//  cout << "map points size:"<<map_->map_points_.size()<<endl;
 }
 
 void VO::optimizeMap()
 {
   boost::timer timer;
-  
+  static float min_match_ratio = min_match_ratio_;
   for(auto iter=map_->map_points_.begin();iter != map_->map_points_.end();)
   {
     MapPoint::Ptr mp = iter->second;
     float match_ratio = (float)mp->matched_times_/mp->visible_times_; 
-    if(match_ratio < 0.3)
+    if(match_ratio < min_match_ratio)
     {
       iter = map_->map_points_.erase(iter);
       continue;
@@ -238,10 +359,28 @@ void VO::optimizeMap()
     iter++;
   }
   
-  if(map_->map_points_.size() < 5000)
-    addMapPoints();
+  if(map_->map_points_.size() > max_map_points_)
+  {
+    min_match_ratio += 0.05;
+  }
+  else
+    min_match_ratio = min_match_ratio_;
   
+  addMapPoints();
+  
+//  cout << "map points size:"<<map_->map_points_.size()<<endl;
 //  cout << "optimizeMap() cost time:"<<timer.elapsed()<<endl;
+}
+
+bool VO::checkEstimatedPose()
+{
+//   if(num_inliers_ < min_inliers_)
+//     return false;
+  
+  if((double)num_inliers_/matched_3d_points_.size() < min_inliers_rate_)
+    return false;
+  
+  return true;
 }
 
 

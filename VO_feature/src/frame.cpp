@@ -45,7 +45,7 @@ bool Frame::isInFrame(const Eigen::Vector3d& p_world)
   Eigen::Vector2d p_pixel;
   p_pixel = camera_->camera2pixel(p_camera);
   
-  if(p_pixel(0,0) < 10 || p_pixel(1,0) < 10 || p_pixel(0,0)>color_.cols-11 || p_pixel(1,0) > color_.rows-11)
+  if(p_pixel(0,0) < 0 || p_pixel(1,0) < 0 || p_pixel(0,0)>color_.cols-1 || p_pixel(1,0) > color_.rows-1)
     return false;
   
   return true;

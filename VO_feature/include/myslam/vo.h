@@ -36,6 +36,19 @@ public:
   ~VO(){};
   bool addFrame(Frame::Ptr frame);
   
+  
+private:
+   int num_of_features_;
+  double orb_sacle_factor_;
+   int orb_level_pyramid_;
+  double min_match_ratio_;
+   int max_num_lost_;
+   double min_inliers_rate_;
+   int max_map_points_;
+   double frame_max_rot_;
+   double frame_max_trans_;
+  
+  
 protected:
   void extractKeyPoints();
   void computeDescriptors();
@@ -45,6 +58,8 @@ protected:
   
   void addKeyFrame();
   void addMapPoints();
+  
+  bool checkEstimatedPose();
 
 };
 }

@@ -98,24 +98,24 @@ int main( int argc, char** argv )
     frame->depth_ = img_depth;
     frame->time_stamp_ = rgb_times[i];
     
-    vo->addFrame(frame);
-   
+    static Eigen::Matrix4d T_cw_m = Eigen::Matrix4d::Identity();
+	
+    if(vo->addFrame(frame))
+      T_cw_m = vo->T_c_w_estimated_.matrix();
+    
     cout<<"time cost:"<<timer.elapsed()<<endl;
-   
-    
-    cv::Mat R,t;
-    
-    Eigen::Matrix4d T_cw_m = vo->T_c_w_estimated_.matrix();
-       
-    
+
     cv::Mat img_show = curr_img_color.clone();
     
-    for(auto index:vo->matched_2d_kp_index_){
-      cv::circle(img_show,vo->key_points_curr_[index].pt,6,cv::Scalar(0,255,0),1);
+    for(auto p_3d:vo->matched_3d_points_)
+    {
+      cv::Mat p;
+      cv::eigen2cv(vo->curr_->camera_->world2pixel(p_3d->pos_,vo->curr_->T_c_w_),p);
+      cv::circle(img_show,cv::Point2d(p.at<double>(0,0),p.at<double>(1,0)),6,cv::Scalar(0,255,0),1);
     }
-    
-    cv::imshow("corners",img_show);
-    
+     cv::imshow("Depth",img_depth);
+    cv::imshow("Features",img_show);
+   
   
       Eigen::Matrix4d T_show;
       

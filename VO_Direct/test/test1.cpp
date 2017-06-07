@@ -135,7 +135,7 @@ int main( int argc, char** argv )
   
   vector<Measurement> last_measurements;
   
-  cv::Ptr<cv::FastFeatureDetector> detector = cv::FastFeatureDetector::create(10);
+  cv::Ptr<cv::FastFeatureDetector> detector = cv::FastFeatureDetector::create(5);
   //cv::Ptr<cv::ORB> detector = cv::ORB::create(500,1.1f,8,31,0,2,cv::ORB::HARRIS_SCORE,31,20);
   
   for(int i=0; i < rgb_files.size();i++)
@@ -302,7 +302,6 @@ int main( int argc, char** argv )
       cv::waitKey(1);
     }
   
-  cv::waitKey(0);
   return 0;
 }
 
