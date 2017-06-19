@@ -21,10 +21,10 @@ camera.k3: 5.7508917737950627e-01
 camera.depth_scale: 5000
 
 # VO paras
-num_of_features: 500
+num_of_features: 300
 orb_sacle_factor: 1.1
-orb_level_pyramid: 8
-min_match_ratio: 0.5
+orb_level_pyramid: 32
+min_match_ratio: 0.3
 max_num_lost: 10
 min_inliers_rate: 0.3
 max_map_points: 5000

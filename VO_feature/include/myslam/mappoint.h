@@ -20,6 +20,7 @@ public:
   
   int matched_times_;
   int visible_times_;
+  double matched_ratio_;
   
   MapPoint();
   MapPoint(unsigned long id,const Eigen::Vector3d &pos,Frame* frame = nullptr,const cv::Mat &descriptor = cv::Mat());

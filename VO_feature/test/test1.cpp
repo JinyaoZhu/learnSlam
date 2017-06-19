@@ -20,6 +20,9 @@
 
 #include "myslam/vo.h"
 
+#include <pcl/point_types.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/visualization/pcl_visualizer.h>
 
 
 #include <stdio.h>
@@ -78,9 +81,11 @@ int main( int argc, char** argv )
   vis.showWidget( "World", world_coor );
   vis.showWidget( "Camera", camera_coor );
   
+  //vector<cv::viz::WCoordinateSystem*> p_camera_i;
+  
   myslam::VO::Ptr vo(new myslam::VO());
   
-  
+ 
   for(int i=0; i < rgb_files.size();i++)
   {
     cv::Mat curr_img_color = cv::imread(rgb_files[i],CV_LOAD_IMAGE_COLOR);
@@ -111,7 +116,7 @@ int main( int argc, char** argv )
     {
       cv::Mat p;
       cv::eigen2cv(vo->curr_->camera_->world2pixel(p_3d->pos_,vo->curr_->T_c_w_),p);
-      cv::circle(img_show,cv::Point2d(p.at<double>(0,0),p.at<double>(1,0)),6,cv::Scalar(0,255,0),1);
+      cv::circle(img_show,cv::Point2d(p.at<double>(0,0),p.at<double>(1,0)),pow(p_3d->matched_ratio_,2)*15,cv::Scalar(0,255,0),1);
     }
      cv::imshow("Depth",img_depth);
     cv::imshow("Features",img_show);
@@ -131,6 +136,8 @@ int main( int argc, char** argv )
       t_show.at<double>(0,0) = T_show(0,3);
       t_show.at<double>(1,0) = T_show(1,3);
       t_show.at<double>(2,0) = T_show(2,3);
+      
+
            
       cv::Affine3d M(R_show,t_show);
       
@@ -139,6 +146,27 @@ int main( int argc, char** argv )
       vis.spinOnce(1, false);
       cv::waitKey(1);
     }
+    
+  typedef pcl::PointXYZRGB PointT;
+  typedef pcl::PointCloud<PointT> PointCloud;
+  
+  PointCloud::Ptr pointCloud(new PointCloud);
+  
+  for(auto iter=vo->map_->map_points_.begin();iter !=vo->map_->map_points_.end();)
+  {
+  	PointT p;
+	p.x = iter->second->pos_(0,0);
+	p.y = iter->second->pos_(1,0);
+	p.z = iter->second->pos_(2,0);
+	p.b = 0;
+	p.g = 0;
+	p.r = 255;
+	pointCloud->points.push_back(p);
+	iter++;
+  }
+  pointCloud->is_dense = false;
+  cout<<pointCloud->size()<<" Points"<<endl;
+  pcl::io::savePCDFileBinary("map.pcd",*pointCloud);
     
   return 0;
 }

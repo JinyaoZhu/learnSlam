@@ -30,6 +30,7 @@ public:
   Sophus::SE3 T_c_w_estimated_;
   int num_inliers_;
   int num_lost_;
+  static unsigned long num_loop_;
   
 public:
   VO();

@@ -24,10 +24,23 @@ double Frame::findDepth(cv::Point2f p)
   ushort d = depth_.ptr<ushort>(cvRound(p.y))[cvRound(p.x)];
   double dd;
   if( d!= 0)
-    dd = (double)d/camera_->depth_scale_;
+    return (double)d/camera_->depth_scale_;
   else
-    dd = -1.0;
-  return dd;
+  {
+    // check the nearby points 
+    int dx[4] = {-1,0,1,0};
+    int dy[4] = {0,-1,0,1};
+    for ( int i=0; i<4; i++ )
+    {
+	d = depth_.ptr<ushort>( cvRound(p.y)+dy[i] )[cvRound(p.y)+dx[i]];
+	if ( d!=0 )
+	{
+	   return  double(d)/camera_->depth_scale_;
+	}
+    }
+  }
+
+  return -1.0;
 }
 
 Eigen::Vector3d Frame::getCameraCenter() const
@@ -45,7 +58,7 @@ bool Frame::isInFrame(const Eigen::Vector3d& p_world)
   Eigen::Vector2d p_pixel;
   p_pixel = camera_->camera2pixel(p_camera);
   
-  if(p_pixel(0,0) < 0 || p_pixel(1,0) < 0 || p_pixel(0,0)>color_.cols-1 || p_pixel(1,0) > color_.rows-1)
+  if(p_pixel(0,0) < 5 || p_pixel(1,0) < 5 || p_pixel(0,0)>color_.cols-6 || p_pixel(1,0) > color_.rows-6)
     return false;
   
   return true;

@@ -12,7 +12,9 @@ find_package( Ceres REQUIRED )
 include_directories( ${CERES_INCLUDE_DIRS} )
 
 # Sophus
-find_package(Sophus REQUIRED)
+#find_package(Sophus REQUIRED)
+set(Sophus_INCLUDE_DIRS "/usr/local/include/sophus")
+set(Sophus_LIBRARIES libSophus.so)
 include_directories(${Sophus_INCLUDE_DIRS})
 
 # OpenCV

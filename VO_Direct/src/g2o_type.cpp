@@ -80,6 +80,7 @@ void bundleAdjustment (
     Eigen::Vector3d x_local = v->estimate().map ( x_world_ );
     float x = x_local[0]*fx_/x_local[2] + cx_;
     float y = x_local[1]*fy_/x_local[2] + cy_;
+    double error;
     // check x,y is in the image
     if ( x-4<0 || ( x+4 ) >image_->cols || ( y-4 ) <0 || ( y+4 ) >image_->rows )
     {
@@ -88,7 +89,10 @@ void bundleAdjustment (
     }
     else
     {
-	_error ( 0,0 ) = getPixelValue ( x,y ) - _measurement;
+      error = getPixelValue ( x,y ) - _measurement;
+      //_error ( 0,0 ) = error*6.0/(6.0+(error/30.0)*(error/30.0));
+      _error ( 0,0 ) = error;
+      
     }
 }
 
@@ -183,11 +187,11 @@ bool poseEstimationDirect ( const vector< Measurement >& measurements, cv::Mat* 
         edge->setInformation ( Eigen::Matrix<double,1,1>::Identity() );
         edge->setId ( id++ );
 	g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
-        rk->setDelta(1.0);
+        rk->setDelta(10.0);
         edge->setRobustKernel(rk);
         optimizer.addEdge ( edge );
     }
-    cout<<"edges in graph: "<<optimizer.edges().size() <<endl;
+//    cout<<"edges in graph: "<<optimizer.edges().size() <<endl;
     optimizer.initializeOptimization();
     optimizer.optimize ( 50 );
     Tcw = pose->estimate();

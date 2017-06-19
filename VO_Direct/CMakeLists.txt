@@ -28,11 +28,17 @@ include_directories( ${G2O_INCLUDE_DIRS} )
 find_package( CSparse REQUIRED )
 include_directories(${CSPARSE_INCLUDE_DIR})
 
+#PCL
+find_package( PCL REQUIRED COMPONENT common io )
+include_directories( ${PCL_INCLUDE_DIRS} )
+add_definitions( ${PCL_DEFINITIONS} )
+
 set( THIRD_PARTY_LIBS 
     ${OpenCV_LIBS}
     ${Sophus_LIBRARIES}
     ${CSPARSE_LIBRARY}
     g2o_core g2o_stuff g2o_types_sba g2o_csparse_extension
+    ${PCL_LIBRARIES}
 )
 ############### source and test ######################
 include_directories( ${PROJECT_SOURCE_DIR}/include )

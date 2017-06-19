@@ -18,6 +18,9 @@
 #include <boost/timer.hpp>
 #include <boost/concept_check.hpp>
 
+#include <pcl/point_types.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/visualization/pcl_visualizer.h>
 
 
 #include <stdio.h>
@@ -135,8 +138,13 @@ int main( int argc, char** argv )
   
   vector<Measurement> last_measurements;
   
-  cv::Ptr<cv::FastFeatureDetector> detector = cv::FastFeatureDetector::create(5);
+  cv::Ptr<cv::FastFeatureDetector> detector = cv::FastFeatureDetector::create(10);
   //cv::Ptr<cv::ORB> detector = cv::ORB::create(500,1.1f,8,31,0,2,cv::ORB::HARRIS_SCORE,31,20);
+  
+  typedef pcl::PointXYZRGB PointT;
+  typedef pcl::PointCloud<PointT> PointCloud;
+  
+  PointCloud::Ptr pointCloud(new PointCloud);
   
   for(int i=0; i < rgb_files.size();i++)
   {
@@ -247,25 +255,7 @@ int main( int argc, char** argv )
     
     cout<<"time cost:"<<timer.elapsed()<<endl;
     
-    cv::Mat R,t;
-    
-    Eigen::Matrix4d T_cr_m = T_cr.matrix();
-    
-    Eigen::Matrix<double,3,3>  R_;
-      R_(0,0) = T_cr_m(0,0);R_(0,1) = T_cr_m(0,1);R_(0,2) = T_cr_m(0,2);
-      R_(1,0) = T_cr_m(1,0);R_(1,1) = T_cr_m(1,1);R_(1,2) = T_cr_m(1,2);
-      R_(2,0) = T_cr_m(2,0);R_(2,1) = T_cr_m(2,1);R_(2,2) = T_cr_m(2,2);
-      
-   Eigen::Matrix<double,3,1> t_;
-   t_(0,0) = T_cr_m(0,3);
-   t_(1,0) = T_cr_m(1,3);
-   t_(2,0) = T_cr_m(2,3);
-   
-   cv::eigen2cv(R_,R);
-   cv::eigen2cv(t_,t);
-    
-    
-    
+        
     cv::Mat img_show = curr_img_color.clone();
     
     for(auto kp:keypoints){
@@ -277,11 +267,15 @@ int main( int argc, char** argv )
   
       Eigen::Matrix4d T_show = Eigen::Matrix4d::Identity();
       
-      static Eigen::Matrix4d T_cw = Eigen::Matrix4d::Identity();
+      //static Eigen::Matrix4d T_cw = Eigen::Matrix4d::Identity();
       
-      T_cw = T_cr_m*T_cw;
+      static Eigen::Isometry3d T_cw = Eigen::Isometry3d::Identity();
       
-      T_show = T_cw.inverse();
+      T_cw = T_cr*T_cw;
+     
+      T_show = T_cw.matrix().inverse();
+      
+    //        cout << T_show <<endl;
       
       cv::Mat_<double> R_show(3,3);
       cv::Mat_<double> t_show(3,1);
@@ -300,7 +294,28 @@ int main( int argc, char** argv )
       vis.setWidgetPose( "Camera", M);
       vis.spinOnce(1, false);
       cv::waitKey(1);
+      
+      // add point cloud
+      Eigen::Vector3d p_world;
+      PointT p;
+      for(auto m:last_measurements)
+      {
+	Eigen::Vector2d pixel;
+        p_world = (T_cw.inverse() * m.pos_world);
+	p.x = p_world(0,0);
+	p.y = p_world(1,0);
+	p.z = p_world(2,0);
+	pixel = camera->camera2pixel(m.pos_world);
+	p.b = curr_img_color.data[(int)pixel(1,0)*curr_img_color.step + (int)pixel(0,0)*curr_img_color.channels()];
+	p.g = curr_img_color.data[(int)pixel(1,0)*curr_img_color.step + (int)pixel(0,0)*curr_img_color.channels() + 1];
+	p.r = curr_img_color.data[(int)pixel(1,0)*curr_img_color.step + (int)pixel(0,0)*curr_img_color.channels() + 2];
+	pointCloud->points.push_back(p);
+      }
     }
+    
+  pointCloud->is_dense = false;
+  cout<<pointCloud->size()<<" Points"<<endl;
+  pcl::io::savePCDFileBinary("map.pcd",*pointCloud);
   
   return 0;
 }
