@@ -9,16 +9,16 @@
 class ceresCostFunction
 {
 public:
-  ceresCostFunction(Eigen::Vector2d observe, Eigen::Matrix3d K):
-  observe_(observe),K_(K) {}
+  ceresCostFunction(Eigen::Vector3d p_world,Eigen::Vector2d observe, Eigen::Matrix3d K):
+  p_world_(p_world),observe_(observe),K_(K) {}
   
     template<typename T>
-    bool operator ()(const T* const x,const T* const p,T* residual)const
+    bool operator ()(const T* const x,T* residual)const
     {
       Eigen::Matrix<T,3,1> omega(x[0],x[1],x[2]);
       Eigen::Matrix<T,3,1> upsilon(x[3],x[4],x[5]);
       
-      Eigen::Matrix<T,3,1> p_world(p[0],p[1],p[2]); 
+      Eigen::Matrix<T,3,1> p_world(T(p_world_(0)),T(p_world_(1)),T(p_world_(2))); 
       
       T theta = omega.norm();
       
@@ -57,11 +57,12 @@ public:
       return true;
     }
   
-  static ceres::CostFunction* Create(Eigen::Vector2d observe, Eigen::Matrix3d K)
+  static ceres::CostFunction* Create(Eigen::Vector3d p_world,Eigen::Vector2d observe, Eigen::Matrix3d K)
   {
-    return new ceres::AutoDiffCostFunction<ceresCostFunction,2,6,3>(new ceresCostFunction(observe,K));
+    return new ceres::AutoDiffCostFunction<ceresCostFunction,2,6>(new ceresCostFunction(p_world,observe,K));
   }
 private:
+  Eigen::Vector3d p_world_;
   Eigen::Vector2d observe_;
   Eigen::Matrix3d K_;
 };

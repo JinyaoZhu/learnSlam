@@ -132,16 +132,17 @@ public:
 
 int main(int argc,char** argv)
 {
-  double x[2] = {2,0};
+  double x[2] = {2,2};
   
   ceres::Problem problem ;
   
   problem.AddResidualBlock(CostFunction::Create(),nullptr,x);
   
   ceres::Solver::Options options;
+  options.linear_solver_type = ceres::DENSE_QR;
   options.minimizer_progress_to_stdout = true;
   options.max_num_iterations = 50000;
-  options.trust_region_strategy_type = ceres::LEVENBERG_MARQUARDT;
+  options.trust_region_strategy_type = ceres::DOGLEG;
   //options.gradient_tolerance = 1e-20;
   //options.parameter_tolerance = 1e-20;
   

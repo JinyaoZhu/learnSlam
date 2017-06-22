@@ -118,7 +118,7 @@ int main( int argc, char** argv )
       cv::eigen2cv(vo->curr_->camera_->world2pixel(p_3d->pos_,vo->curr_->T_c_w_),p);
       cv::circle(img_show,cv::Point2d(p.at<double>(0,0),p.at<double>(1,0)),pow(p_3d->matched_ratio_,2)*6,cv::Scalar(0,255,0),1);
     }
-   //  cv::imshow("Depth",img_depth);
+     cv::imshow("Depth",img_depth);
     cv::imshow("Features",img_show);
    
   

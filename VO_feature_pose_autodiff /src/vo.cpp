@@ -2,11 +2,9 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/calib3d/calib3d.hpp>
-#include <opencv2/core/eigen.hpp>
 
 #include "myslam/g2o_type.h"
 #include "myslam/config.h"
-#include "myslam/ceres_bundle.h"
 
 #include "boost/timer.hpp"
 #include <sys/stat.h>
@@ -177,7 +175,7 @@ void VO::poseEstimatePnP()
   cv::Mat rvec,tvec,inliers;
   cv::solvePnPRansac(pts_3d,pts_2d,curr_->camera_->matrix_,
    curr_->camera_->distor_,rvec,tvec,false,100,6.0,0.99,inliers);
-   
+    
   num_inliers_ = inliers.rows;
   
 //  cout<<"inliers rate:"<<(double)num_inliers_/matched_3d_points_.size()<<endl;
@@ -185,163 +183,75 @@ void VO::poseEstimatePnP()
   // too few inliners
   if((double)num_inliers_/matched_3d_points_.size() < min_inliers_rate_)
     return;
-   
+  
   for(int i=0; i<inliers.rows; i++)
   {
      int index = inliers.at<int> ( i,0 );
-     
-     if(state_!= LOST)
-       matched_3d_points_[index]->matched_times_ ++;
-     
+     matched_3d_points_[index]->matched_times_ ++;
      matched_3d_points_[index]->matched_ratio_ = (float) matched_3d_points_[index]->matched_times_/ matched_3d_points_[index]->visible_times_; 
   }
   
   
-   T_c_w_estimated_ = Sophus::SE3 (Sophus::SO3( rvec.at<double> ( 0,0 ), rvec.at<double> ( 1,0 ), rvec.at<double> ( 2,0 ) ),
-                            Eigen::Vector3d ( tvec.at<double> ( 0,0 ), tvec.at<double> ( 1,0 ), tvec.at<double> ( 2,0 ) ) );
-   
+  Sophus::SE3 T_c_w_estimated(Sophus::SO3( rvec.at<double> ( 0,0 ), rvec.at<double> ( 1,0 ), rvec.at<double> ( 2,0 ) ),
+                           Eigen::Vector3d ( tvec.at<double> ( 0,0 ), tvec.at<double> ( 1,0 ), tvec.at<double> ( 2,0 ) ));
   
-    vector<Eigen::Vector3d> p3d;
-    vector<Eigen::Vector2d> p2d;
-    Eigen::Matrix<double,6,1>se3;
-    Eigen::Matrix<double,3,3> K;
-        
-    se3 = g2o::SE3Quat(T_c_w_estimated_.rotation_matrix(),T_c_w_estimated_.translation()).log();
-    
-    for ( int i=0; i<inliers.rows; i++ )
-    {
-      int index = inliers.at<int>( i,0 );
-      p3d.push_back(Eigen::Vector3d ( pts_3d[index].x, pts_3d[index].y, pts_3d[index].z ));
-      p2d.push_back(Eigen::Vector2d ( pts_2d[index].x, pts_2d[index].y ));
-    }
-    
-    cv::cv2eigen(curr_->camera_->matrix_,K);
-    
-    ceresBundle(p3d,p2d,K,se3);
-     
-    T_c_w_estimated_ = Sophus::SE3(g2o::SE3Quat::exp(se3).rotation(),g2o::SE3Quat::exp(se3).translation());
-    
-    for ( int i=0; i<inliers.rows; i++ )
-    {
-      int index = inliers.at<int>( i,0 );
-      matched_3d_points_[index]->pos_ = p3d[i];
-    }
-   
      // using bundle adjustment to optimize the pose
-//     typedef g2o::BlockSolver<g2o::BlockSolverTraits<6,2>> Block;
-//     Block::LinearSolverType* linearSolver = new g2o::LinearSolverDense<Block::PoseMatrixType>();
-//     Block* solver_ptr = new Block ( linearSolver );
-//     g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg ( solver_ptr );
-//     g2o::SparseOptimizer optimizer;
-//     optimizer.setAlgorithm ( solver );
-//     optimizer.setVerbose ( false );
-// 
-//     g2o::VertexSE3Expmap* pose = new g2o::VertexSE3Expmap();
-//     pose->setId ( 0 );
-//     pose->setEstimate ( g2o::SE3Quat (
-//         T_c_w_estimated_.rotation_matrix(), T_c_w_estimated_.translation()
-//     ));
-//     optimizer.addVertex ( pose );
-// 
-//     // edges
-//     for ( int i=0; i<inliers.rows; i++ )
-//     {
-//         int index = inliers.at<int>( i,0 );
-//         // 3D -> 2D projection
-//         EdgeProjectXYZ2UVPoseOnly* edge = new EdgeProjectXYZ2UVPoseOnly();
-//         edge->setId ( i );
-//         edge->setVertex ( 0, pose );
-//         edge->camera_ = curr_->camera_.get();
-//         edge->point_ = Eigen::Vector3d ( pts_3d[index].x, pts_3d[index].y, pts_3d[index].z );
-//         edge->setMeasurement ( Eigen::Vector2d ( pts_2d[index].x, pts_2d[index].y ) );
-//         edge->setInformation ( Eigen::Matrix2d::Identity() );
-// 	g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
-//         rk->setDelta(30.0);
-//         edge->setRobustKernel(rk);
-//         optimizer.addEdge ( edge );
-//     }
-// 
-//     
-//     optimizer.initializeOptimization();
-//     optimizer.optimize ( 50 );
-// 
-//     T_c_w_estimated_ = Sophus::SE3 (
-//         pose->estimate().rotation(),
-//         pose->estimate().translation()
-//     );
-  
-//     typedef g2o::BlockSolver< g2o::BlockSolverTraits<6,3> > Block;  
-//     Block::LinearSolverType* linearSolver = new g2o::LinearSolverCSparse<Block::PoseMatrixType>(); 
-//     Block* solver_ptr = new Block ( linearSolver );    
-//     g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg ( solver_ptr );
-//     g2o::SparseOptimizer optimizer;
-//     optimizer.setAlgorithm ( solver );
-// 
-//     // vertex
-//     g2o::VertexSE3Expmap* pose = new g2o::VertexSE3Expmap(); // camera pose
-// 
-//     pose->setId ( 0 );
-//     pose->setEstimate ( g2o::SE3Quat (T_c_w_estimated_.rotation_matrix(), T_c_w_estimated_.translation()) );
-//     
-//     optimizer.addVertex ( pose );
-// 
-//     
-//     vector<g2o::VertexSBAPointXYZ*> point;
-//     
-//     for(int i=0;i<inliers.rows;i++)
-//       point.push_back(new g2o::VertexSBAPointXYZ());
-//     
-//     // landmarks
-//     for ( int i=0; i<inliers.rows; i++ )
-//     {
-//       int index = inliers.at<int>( i,0 );
-//       point[i]->setId ( i + 1 );
-//       point[i]->setEstimate ( Eigen::Vector3d ( pts_3d[index].x, pts_3d[index].y, pts_3d[index].z ) );
-//       point[i]->setMarginalized ( true ); 
-//       optimizer.addVertex ( point[i]);
-//     }
-// 
-//     // parameter: camera intrinsics
-//     g2o::CameraParameters* camera = new g2o::CameraParameters (
-//         curr_->camera_->fx_, Eigen::Vector2d( curr_->camera_->cx_, curr_->camera_->cy_), 0);
-//     camera->setId ( 0 );
-//     optimizer.addParameter ( camera );
-// 
-//     // edges
-//     for ( int i=0; i<inliers.rows; i++ )
-//     {
-//         int index = inliers.at<int>( i,0 );
-//         g2o::EdgeProjectXYZ2UV* edge = new g2o::EdgeProjectXYZ2UV();
-//         edge->setId ( i );
-//         //edge->setVertex ( 0, dynamic_cast<g2o::VertexSBAPointXYZ*> ( optimizer.vertex ( i+1 ) ) );
-// 	edge->setVertex ( 0, point[i]);
-//         edge->setVertex ( 1, pose );
-//         edge->setMeasurement (  Eigen::Vector2d ( pts_2d[index].x, pts_2d[index].y ) );
-//         edge->setParameterId ( 0,0 );
-//         edge->setInformation ( Eigen::Matrix2d::Identity() );
-// 	g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
-//         rk->setDelta(1.0);
-//         edge->setRobustKernel(rk);
-//         optimizer.addEdge ( edge );
-//     }
-//    
-// 
-//     optimizer.setVerbose ( false );
-//     optimizer.initializeOptimization();
-//     optimizer.optimize ( 100 );
-//     T_c_w_estimated_ = Sophus::SE3 (
-//         pose->estimate().rotation(),
-//         pose->estimate().translation()
-//     );
-//     
-// 
-//     for ( int i=0; i<inliers.rows; i++ )
-//     {
-//       int index = inliers.at<int>( i,0 );
-//       matched_3d_points_[index]->pos_ = point[i]->estimate();
-//     }
+    typedef g2o::BlockSolver<g2o::BlockSolverTraits<6,3>> Block;
+    Block::LinearSolverType* linearSolver = new g2o::LinearSolverDense<Block::PoseMatrixType>();
+    Block* solver_ptr = new Block ( linearSolver );
+    g2o::OptimizationAlgorithmLevenberg* solver = new g2o::OptimizationAlgorithmLevenberg ( solver_ptr );
+//    g2o::OptimizationAlgorithmDogleg* solver = new g2o::OptimizationAlgorithmDogleg ( solver_ptr );
+    g2o::SparseOptimizer optimizer;
+    optimizer.setAlgorithm ( solver );
+    optimizer.setVerbose ( true );
+
+    // vertex pose
+    VertexProjectXYZ2UVPose* pose = new VertexProjectXYZ2UVPose();
+    pose->setId ( 0 );
+    pose->setEstimate (g2o::SE3Quat (T_c_w_estimated.rotation_matrix(), T_c_w_estimated.translation()).log());
+    optimizer.addVertex ( pose );
     
-//    cout << "poseEstimatePnP() cost time:"<<timer.elapsed()<<endl;
+    // landmarks
+    for ( int i=0; i<inliers.rows; i++ )
+    {
+      int index = inliers.at<int>( i,0 );
+      VertexProjectXYZ2UVPoint* point = new VertexProjectXYZ2UVPoint();
+      point->setId ( i + 1 );
+      point->setEstimate ( Eigen::Vector3d ( pts_3d[index].x, pts_3d[index].y, pts_3d[index].z ) );
+      point->setMarginalized ( true ); 
+      optimizer.addVertex (point);
+    }
+
+    // edges
+    for ( int i=0; i<inliers.rows; i++ )
+    {
+        int index = inliers.at<int>( i,0 );
+        // 3D -> 2D projection
+        EdgeProjectXYZ2UV* edge = new EdgeProjectXYZ2UV();
+        edge->setId ( i );
+        edge->setVertex ( 0, optimizer.vertex(0) );
+	edge->setVertex ( 1, optimizer.vertex(i+1));
+        edge->camera_ = curr_->camera_.get();
+        edge->setMeasurement ( Eigen::Vector2d ( pts_2d[index].x, pts_2d[index].y ) );
+        edge->setInformation ( Eigen::Matrix2d::Identity() );
+	g2o::RobustKernelHuber* rk = new g2o::RobustKernelHuber;
+        rk->setDelta(10.0);
+        edge->setRobustKernel(rk);
+        optimizer.addEdge ( edge );
+    }
+
+    
+    optimizer.initializeOptimization();
+    optimizer.optimize ( 1000 );
+    
+     T_c_w_estimated_ = Sophus::SE3 (g2o::SE3Quat::exp(pose->estimate()).rotation(),
+                           g2o::SE3Quat::exp(pose->estimate()).translation() );
+     
+      for ( int i=0; i<inliers.rows; i++ )
+      {
+	int index = inliers.at<int>( i,0 );
+	matched_3d_points_[index]->pos_ = dynamic_cast<VertexProjectXYZ2UVPoint*>(optimizer.vertex(i+1))->estimate();
+      }
 }
 
 void VO::addKeyFrame()
@@ -371,7 +281,7 @@ void VO::addMapPoints()
     map_->insertMapPoint(map_point);
     add_size++;
   }
-//  cout << "add "<<add_size<<" map points"<<endl;
+  cout << "add "<<add_size<<" map points"<<endl;
 //  cout << "map points size:"<<map_->map_points_.size()<<endl;
 }
 

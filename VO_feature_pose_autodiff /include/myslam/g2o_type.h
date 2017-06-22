@@ -44,12 +44,34 @@
 namespace myslam
 {
 
-class VertexProjectXYZ2UVPoseOnly : public g2o::BaseVertex<6,Eigen::Matrix<double,6,1>>
+class VertexProjectXYZ2UVPoint : public g2o::BaseVertex<3,Eigen::Matrix<double,3,1>>
 {
 public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  VertexProjectXYZ2UVPoseOnly(){}
+  VertexProjectXYZ2UVPoint(){}
+
+  virtual bool read(istream& in){}
+  virtual bool write(ostream& out)const{};
+
+  virtual void setToOriginImpl() {
+       _estimate.setZero();
+  }
+
+  virtual void oplusImpl(const double* update_)  {
+    
+    Eigen::Matrix<double,3,1>::ConstMapType update(update_);
+   
+    _estimate += update;
+  }  
+};
+
+class VertexProjectXYZ2UVPose : public g2o::BaseVertex<6,Eigen::Matrix<double,6,1>>
+{
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  VertexProjectXYZ2UVPose(){}
 
   virtual bool read(istream& in){}
   virtual bool write(ostream& out)const{};
@@ -69,23 +91,26 @@ public:
 
 
 
-class EdgeProjectXYZ2UVPoseOnly: public g2o::BaseUnaryEdge<2, Eigen::Vector2d, VertexProjectXYZ2UVPoseOnly>
+class EdgeProjectXYZ2UV: public g2o::BaseBinaryEdge<2, Eigen::Vector2d, VertexProjectXYZ2UVPose,VertexProjectXYZ2UVPoint>
 {
 public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     
     void computeError()
     {
- 	const VertexProjectXYZ2UVPoseOnly* pose = static_cast<const VertexProjectXYZ2UVPoseOnly*> ( _vertices[0] );
-
-	(*this)(pose->estimate().data(),_error.data());
+ 	const VertexProjectXYZ2UVPose* pose = static_cast<const VertexProjectXYZ2UVPose*> (vertex(0));
+        const VertexProjectXYZ2UVPoint* point = static_cast<const VertexProjectXYZ2UVPoint*> (vertex(1));
+	
+	(*this)(pose->estimate().data(),point->estimate().data(),_error.data());
     }
     
     template<typename T>
-    bool operator ()(const T* const x,T* residual)const
+    bool operator ()(const T* const x,const T*const p,T* residual)const
     {
       Eigen::Matrix<T,3,1> omega(x[0],x[1],x[2]);
       Eigen::Matrix<T,3,1> upsilon(x[3],x[4],x[5]);
+      
+      Eigen::Matrix<T,3,1> land_mark(p[0],p[1],p[2]); 
       
       T theta = omega.norm();
       
@@ -100,7 +125,7 @@ public:
       Eigen::AngleAxis<T> angle_axis(theta,omega_n);
       
       Eigen::Matrix<T,3,3>V;
-       
+     
       if(theta < T(1e-10))
       {
 	V = angle_axis.toRotationMatrix();
@@ -111,10 +136,8 @@ public:
 	    + (1.0 - sin(theta)/theta)*omega_n*omega_n.transpose() 
 	    + (1.0-cos(theta))/theta*omega_n_hat;
       }
-	  
-      Eigen::Matrix<T,3,1> p_world(T(point_(0)),T(point_(1)),T(point_(2))); 
 	      
-      Eigen::Matrix<T,3,1> p_cam = angle_axis*p_world + V*upsilon;
+      Eigen::Matrix<T,3,1> p_cam = angle_axis*land_mark + V*upsilon;
 
       Eigen::Matrix<T,2,1> p_pixel;
 
@@ -128,69 +151,23 @@ public:
 
     void linearizeOplus()
     {
-	const VertexProjectXYZ2UVPoseOnly* pose = static_cast<const VertexProjectXYZ2UVPoseOnly*> ( _vertices[0] );
-	
-// 	Eigen::Matrix<double,6,1> se3 = pose->estimate();
-// 	
-// 	Eigen::Vector3d omega(se3(0),se3(1),se3(2));
-// 	Eigen::Vector3d upsilon(se3(3),se3(4),se3(5));
-//  	
-//  	double theta = omega.norm();
-// 	
-// 	Eigen::Vector3d omega_n = omega/theta;
-// 	
-// 	Eigen::Matrix<double,3,3> omega_n_hat;
-// 	
-// 	omega_n_hat(0,0) = 0;           omega_n_hat(0,1) = -omega_n(2); omega_n_hat(0,2) = omega_n(1);
-// 	omega_n_hat(1,0) = omega_n(2);  omega_n_hat(1,1) = 0;           omega_n_hat(1,2) = -omega_n(0);
-// 	omega_n_hat(2,0) = -omega_n(1); omega_n_hat(2,1) = omega_n(0);  omega_n_hat(2,2) = 0;
-//  	
-//  	Eigen::AngleAxis<double> angle_axis(theta,omega_n);
-// 	
-// 	Eigen::Matrix<double,3,3>V;
-// 	
-// 	V = Eigen::Matrix<double,3,3>::Identity()*sin(theta)/theta
-// 	    + (1 - sin(theta)/theta)*omega_n*omega_n.transpose() 
-// 	    + (1-cos(theta))/theta*omega_n_hat;
-//  		
-//  	Eigen::Vector3d p_cam = angle_axis*point_ + V*upsilon;
-// 	
-// 	double x = p_cam(0);
-// 	double y = p_cam(1);
-// 	double z = p_cam(2);
-// 	double z_2 = z*z;
-// 
-// 	_jacobianOplusXi ( 0,0 ) =  x*y/z_2 *camera_->fx_;
-// 	_jacobianOplusXi ( 0,1 ) = -( 1+ ( x*x/z_2 ) ) *camera_->fx_;
-// 	_jacobianOplusXi ( 0,2 ) = y/z * camera_->fx_;
-// 	
-// 	_jacobianOplusXi ( 0,3 ) = -1./z * camera_->fx_;
-// 	_jacobianOplusXi ( 0,4 ) = 0;
-// 	_jacobianOplusXi ( 0,5 ) = x/z_2 * camera_->fx_;
-// 
-// 	_jacobianOplusXi ( 1,0 ) = ( 1+y*y/z_2 ) *camera_->fy_;
-// 	_jacobianOplusXi ( 1,1 ) = -x*y/z_2 *camera_->fy_;
-// 	_jacobianOplusXi ( 1,2 ) = -x/z *camera_->fy_;
-// 	
-// 	_jacobianOplusXi ( 1,3 ) = 0;
-// 	_jacobianOplusXi ( 1,4 ) = -1./z *camera_->fy_;
-// 	_jacobianOplusXi ( 1,5 ) = y/z_2 *camera_->fy_;
-
-	double se3[6] = {pose->estimate()(0),pose->estimate()(1),pose->estimate()(2),
-	  pose->estimate()(3),pose->estimate()(4),pose->estimate()(5)};
-	  
-	Eigen::Matrix<double,2, 6,Eigen::RowMajor> J_error;
-	double *parameters[] = {se3};
-	double *jacobians[] = {J_error.data()};
+	const VertexProjectXYZ2UVPose* pose = static_cast<const VertexProjectXYZ2UVPose*> ( vertex(0) );
+	const VertexProjectXYZ2UVPoint* point = static_cast<const VertexProjectXYZ2UVPoint*> (vertex(1) );
+		  
+	Eigen::Matrix<double,2, 6,Eigen::RowMajor> J_pose;
+	Eigen::Matrix<double,2, 3,Eigen::RowMajor> J_point;
+	double *parameters[] = {const_cast<double*> (pose->estimate().data()),const_cast<double*> (point->estimate().data())};
+	double *jacobians[] = {J_pose.data(),J_point.data()};
 	double value[2];
 	
-	typedef ceres::internal::AutoDiff<EdgeProjectXYZ2UVPoseOnly,double,6> AutoDiffType;
+	typedef ceres::internal::AutoDiff<EdgeProjectXYZ2UV,double,6,3> AutoDiffType;
 	
 	bool diffState = AutoDiffType::Differentiate( *this, parameters, 2, value, jacobians);
 	
 	if(diffState)
 	{
-	  _jacobianOplusXi = J_error;
+	  _jacobianOplusXi = J_pose;
+	  _jacobianOplusXj = J_point;
 	}
 	else
 	{
@@ -203,7 +180,6 @@ public:
     virtual bool read( std::istream& in ){}
     virtual bool write(std::ostream& os) const {};
     
-    Eigen::Vector3d point_;
     Camera* camera_;
 };
 

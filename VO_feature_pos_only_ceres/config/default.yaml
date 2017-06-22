@@ -22,12 +22,12 @@ camera.depth_scale: 5000
 
 # VO paras
 num_of_features: 350
-orb_sacle_factor: 1.2
-orb_level_pyramid: 8
-min_match_ratio: 0.25
+orb_sacle_factor: 1.1
+orb_level_pyramid: 16
+min_match_ratio: 0.3
 max_num_lost: 10
 min_inliers_rate: 0.3
-max_map_points: 1000
+max_map_points: 2000
 keyframe_rotation: 0.1
 keyframe_translation: 0.1
 frame_max_rot:1

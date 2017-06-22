@@ -220,12 +220,6 @@ void VO::poseEstimatePnP()
     ceresBundle(p3d,p2d,K,se3);
      
     T_c_w_estimated_ = Sophus::SE3(g2o::SE3Quat::exp(se3).rotation(),g2o::SE3Quat::exp(se3).translation());
-    
-    for ( int i=0; i<inliers.rows; i++ )
-    {
-      int index = inliers.at<int>( i,0 );
-      matched_3d_points_[index]->pos_ = p3d[i];
-    }
    
      // using bundle adjustment to optimize the pose
 //     typedef g2o::BlockSolver<g2o::BlockSolverTraits<6,2>> Block;
