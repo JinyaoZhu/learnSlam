@@ -1,7 +1,7 @@
 %YAML:1.0
 # data
 # the tum dataset directory, change it to yours! 
-dataset_dir: /home/jinyao/SLAM_Datasets/rgbd_dataset_freiburg2_desk
+dataset_dir: /home/jinyao/SLAM_Datasets/rgbd_dataset_freiburg1_xyz
 #rgbd_dataset_freiburg2_360_hemisphere
 
 # camera intrinsics
@@ -21,9 +21,9 @@ camera.k3: 5.7508917737950627e-01
 camera.depth_scale: 5000
 
 # VO paras
-num_of_features: 300
+num_of_features: 500
 orb_sacle_factor: 1.1
-orb_level_pyramid: 32
+orb_level_pyramid: 16
 min_match_ratio: 0.3
 max_num_lost: 10
 min_inliers_rate: 0.3

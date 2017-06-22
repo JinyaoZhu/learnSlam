@@ -90,7 +90,6 @@ void bundleAdjustment (
     else
     {
       error = getPixelValue ( x,y ) - _measurement;
-      //_error ( 0,0 ) = error*6.0/(6.0+(error/30.0)*(error/30.0));
       _error ( 0,0 ) = error;
       
     }

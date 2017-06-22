@@ -20,17 +20,17 @@ using namespace std;
 //     {
 //       const double x = parameters[0];
 //       const double y = parameters[1];
-// //       cost[0] = (1.0 - x) * (1.0 - x) + 100.0 * (y - x * x) * (y - x * x);
-// //       if (gradient != NULL) {
-// // 	gradient[0] = -2.0 * (1.0 - x) - 200.0 * (y - x * x) * 2.0 * x;
-// // 	gradient[1] = 200.0 * (y - x * x);
-// //       }
-//       cost[0] = x*x + y*y;
-//       if(gradient != NULL)
-//       {
-// 	gradient[0] = 2*x;
-// 	gradient[1] = 2*y;
+//       cost[0] = (1.0 - x) * (1.0 - x) + 100.0 * (y - x * x) * (y - x * x);
+//       if (gradient != NULL) {
+// 	gradient[0] = -2.0 * (1.0 - x) - 200.0 * (y - x * x) * 2.0 * x;
+// 	gradient[1] = 200.0 * (y - x * x);
 //       }
+// //      cost[0] = x*x + y*y;
+// //       if(gradient != NULL)
+// //       {
+// // 	gradient[0] = 2*x;
+// // 	gradient[1] = 2*y;
+// //       }
 //       return true;
 //     }
 //    
@@ -39,7 +39,7 @@ using namespace std;
 // 
 // int main(int argc, char **argv)
 // {
-//   double xy[2] = {-2,-2};
+//   double xy[2] = {-0,-0};
 //    
 //   ceres::GradientProblem problem (new CostFunction());
 //   
@@ -66,29 +66,73 @@ using namespace std;
 //   f3 = (x2 - 2*x3)^2
 //   f4 = sqrt(10) * (x1 - x4)^2
 
+// class CostFunction
+// {
+// public:
+//     CostFunction(){}
+//     template <typename T>
+//     bool operator()(const T* const x,T* residual)const
+//     {
+//       residual[0] = x[0] + T(10.0)*x[1];
+//       residual[1] = T(sqrt(5.0))*(x[2]-x[3]);
+//       residual[2] = pow(x[1] - T(2.0)*x[2],2);
+//       residual[3] = T(sqrt(10.0))*pow(x[0] - x[3],2);
+//       return true;
+//     }
+//     
+//     static ceres::CostFunction* Create(){
+//       return new ceres::AutoDiffCostFunction<CostFunction,4,4>(new CostFunction());
+//     }
+//   
+// };
+
+
+// class CostFunction : public ceres::SizedCostFunction<1,2> 
+// {
+// public:    
+//    virtual ~CostFunction() {}
+//    
+//    virtual bool Evaluate(double const* const* parameters, double* residual,double** jacobians) const 
+//    {
+//       double x = parameters[0][0];
+//       double y = parameters[0][1];
+//       residual[0] = (1.0 - x) * (1.0 - x) + 100.0 * (y - x * x) * (y - x * x);
+//    
+//    
+//     if (jacobians != NULL && jacobians[0] != NULL) 
+//     {
+//       jacobians[0][0] = -2*(1.0-x) - 400.0*(y-x*x)*x;
+//       jacobians[0][1] = 200*(y - x*x);
+//     }
+//     
+//     return true;
+//    }
+//     
+// };
+
 class CostFunction
 {
 public:
     CostFunction(){}
     template <typename T>
-    bool operator()(const T* const x,T* residual)const
+    bool operator()(const T* const p,T* residual)const
     {
-      residual[0] = x[0] + T(10.0)*x[1];
-      residual[1] = T(sqrt(5.0))*(x[2]-x[3]);
-      residual[2] = pow(x[1] - T(2.0)*x[2],2);
-      residual[3] = T(sqrt(10.0))*pow(x[0] - x[3],2);
+      T x = p[0];
+      T y = p[1];
+      residual[0] = (1.0 - x) * (1.0 - x) + 100.0 * (y - x * x) * (y - x * x);
+      //residual[0] = (x*x+y*y);
       return true;
     }
     
     static ceres::CostFunction* Create(){
-      return new ceres::AutoDiffCostFunction<CostFunction,4,4>(new CostFunction());
+      return new ceres::AutoDiffCostFunction<CostFunction,1,2>(new CostFunction());
     }
   
 };
 
 int main(int argc,char** argv)
 {
-  double x[4] = {30,-10,0,100};
+  double x[2] = {2,0};
   
   ceres::Problem problem ;
   
@@ -96,7 +140,10 @@ int main(int argc,char** argv)
   
   ceres::Solver::Options options;
   options.minimizer_progress_to_stdout = true;
-  options.max_num_iterations = 1000;
+  options.max_num_iterations = 50000;
+  options.trust_region_strategy_type = ceres::LEVENBERG_MARQUARDT;
+  //options.gradient_tolerance = 1e-20;
+  //options.parameter_tolerance = 1e-20;
   
   ceres::Solver::Summary summary;
   
@@ -104,6 +151,6 @@ int main(int argc,char** argv)
 
   cout << summary.BriefReport() <<endl;
 
-  cout << Eigen::Vector4d(x) << endl;
+  cout << Eigen::Vector2d(x) << endl;
   return 0;
 }
