@@ -28,7 +28,7 @@ camera.k3: 5.7508917737950627e-01
 camera.depth_scale: 5000
 
 # VO paras
-num_of_features: 400
+num_of_features: 350
 orb_sacle_factor: 1.2
 orb_level_pyramid: 8
 min_match_ratio: 0.5

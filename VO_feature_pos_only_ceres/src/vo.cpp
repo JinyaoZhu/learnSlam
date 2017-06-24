@@ -133,15 +133,14 @@ void VO::featureMatching()
       p->visible_times_++;
       map_candidates.push_back(p);
       candidates_descriptor.push_back(p->descriptor_);
+      if(candidates_descriptor.rows > (1.5*num_of_features_))
+        break;
     }
     else
     {
       map_candidates.push_back(p);
       candidates_descriptor.push_back(p->descriptor_);
     }
-    
-    if(candidates_descriptor.rows > (1.5*num_of_features_))
-      break;
   }
 //  cout<<"candidates size:"<<map_candidates.size()<<endl;
   matcher_->match(candidates_descriptor,descriptor_curr_,matches);
