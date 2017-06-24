@@ -8,7 +8,7 @@ MapPoint::MapPoint():id_(0),is_good_(true),pos_(Eigen::Vector3d(0,0,0)),
 {}
   
 MapPoint::MapPoint(long unsigned int id, const Eigen::Vector3d& pos, Frame* frame, const cv::Mat& descriptor):
-id_(id),pos_(pos),is_good_(true),descriptor_(descriptor),visible_times_(1),matched_times_(1),matched_ratio_(1)
+id_(id),pos_(pos),is_good_(true),descriptor_(descriptor),visible_times_(1),matched_times_(0),matched_ratio_(0)
 {
   observed_frames_.push_back(frame);
 }

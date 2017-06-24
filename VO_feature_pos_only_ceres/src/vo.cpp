@@ -28,7 +28,9 @@ curr_(nullptr), num_inliers_(0), num_lost_(0) //,matcher_(new cv::flann::LshInde
   frame_max_trans_ = Config::get<int>("frame_max_trans");
   
   
-  detector_ = cv::ORB::create ( num_of_features_,orb_sacle_factor_,orb_level_pyramid_);
+  detector_ = cv::ORB::create ( num_of_features_,orb_sacle_factor_,orb_level_pyramid_,31,
+     0, 2, cv::ORB::HARRIS_SCORE, 31);
+  
   matcher_ =  cv::DescriptorMatcher::create ( "BruteForce-Hamming" );
 }
   
@@ -37,7 +39,7 @@ bool VO::addFrame(Frame::Ptr frame)
 {
   num_loop_++;
   curr_ = frame;
-  cout << "map points size:"<<map_->map_points_.size()<<endl;
+//  cout << "map points size:"<<map_->map_points_.size()<<endl;
   switch(state_)
   {
   case INITIALIZE:
@@ -85,6 +87,7 @@ bool VO::addFrame(Frame::Ptr frame)
       state_ = OK;
       curr_->T_c_w_ = T_c_w_estimated_;
       ref_ = curr_;
+      cout<<"recover!"<<endl;
     }
     break;
   }
@@ -100,7 +103,7 @@ else
 void VO::extractKeyPoints()
 {
   boost::timer timer;
-  
+    
   detector_->detect(curr_->color_,key_points_curr_);
 //  cout << "key point size:"<<key_points_curr_.size()<<endl;
   
@@ -137,6 +140,8 @@ void VO::featureMatching()
       candidates_descriptor.push_back(p->descriptor_);
     }
     
+    if(candidates_descriptor.rows > (1.5*num_of_features_))
+      break;
   }
 //  cout<<"candidates size:"<<map_candidates.size()<<endl;
   matcher_->match(candidates_descriptor,descriptor_curr_,matches);
@@ -392,12 +397,22 @@ void VO::optimizeMap()
     iter++;
   }
   
-  if(map_->map_points_.size() > max_map_points_)
+  if(map_->map_points_.size() > max_map_points_ - 200)
   {
-      min_match_ratio += 0.01;
+    min_match_ratio += 0.05;
   }
   else
     min_match_ratio = min_match_ratio_;
+  
+  if(map_->map_points_.size() > max_map_points_)
+  {
+    for(int i=0;i<(map_->map_points_.size() - max_map_points_);i++)
+    {
+      unordered_map<unsigned long,MapPoint::Ptr>::iterator min_ratio_iter = std::min_element (
+				    map_->map_points_.begin(), map_->map_points_.end());
+      map_->map_points_.erase(min_ratio_iter);
+    }
+  }
   
   addMapPoints();
   

@@ -5,7 +5,8 @@
 
 
 
-void ceresBundle(vector<Eigen::Vector3d> &p3d,vector<Eigen::Vector2d> &p2d,Eigen::Matrix3d &K,Eigen::Matrix<double,6,1> &se3)
+void ceresBundle(vector<Eigen::Vector3d> &p3d,vector<Eigen::Vector2d> &p2d,
+		 const Eigen::Matrix3d &K,Eigen::Matrix<double,6,1> &se3)
 {
   ceres::Problem problem;
   

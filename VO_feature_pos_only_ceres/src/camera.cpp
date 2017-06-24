@@ -32,12 +32,15 @@ Eigen::Vector3d Camera::camera2world(const Eigen::Vector3d& p_c, const Sophus::S
 
 Eigen::Vector2d Camera::camera2pixel(const Eigen::Vector3d& p_c)
 {
-  return Eigen::Vector2d(fx_*p_c(0,0)/p_c(2,0) + cx_,fx_*p_c(1,0)/p_c(2,0) + cy_);
+  Eigen::Vector2d camera_n(p_c(0)/p_c(2),p_c(1)/p_c(2));
+  return Eigen::Vector2d(fx_*camera_n(0) + cx_,fy_*camera_n(1) + cy_);
 }
 
 Eigen::Vector3d Camera::pixel2camera(const Eigen::Vector2d& p_p, double depth)
 {
-  return Eigen::Vector3d((p_p(0,0)-cx_)*depth/fx_,(p_p(1,0)-cy_)*depth/fy_,depth);
+  Eigen::Vector2d camera_n((p_p(0)-cx_)/fx_,(p_p(1)-cy_)/fy_);
+  
+  return Eigen::Vector3d(camera_n(0)*depth,camera_n(1)*depth,depth);
 }
 
 Eigen::Vector2d Camera::world2pixel(const Eigen::Vector3d& p_w, const Sophus::SE3& T_c_w)

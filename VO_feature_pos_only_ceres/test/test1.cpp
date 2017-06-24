@@ -108,20 +108,28 @@ int main( int argc, char** argv )
     if(vo->addFrame(frame))
       T_cw_m = vo->T_c_w_estimated_.matrix();
     
-    cout<<"time cost:"<<timer.elapsed()<<endl;
+    double cost_time = timer.elapsed();
+    //cout<<"time cost:"<< cost_time  <<endl;
 
-    cv::Mat img_show = curr_img_color.clone();
+    cv::Mat img_show;// = cv::Mat(curr_img_color.cols,curr_img_color.rows + 20,curr_img_color.type());
+    
+    //img_show = curr_img_color.clone();
+    cv::copyMakeBorder(curr_img_color,img_show,0,35,0,0,cv::BORDER_CONSTANT);
     
     for(auto p_3d:vo->matched_3d_points_)
     {
       cv::Mat p;
       cv::eigen2cv(vo->curr_->camera_->world2pixel(p_3d->pos_,vo->curr_->T_c_w_),p);
-      cv::circle(img_show,cv::Point2d(p.at<double>(0,0),p.at<double>(1,0)),pow(p_3d->matched_ratio_,2)*6,cv::Scalar(0,255,0),1);
+      cv::circle(img_show,cv::Point2d(p.at<double>(0,0),p.at<double>(1,0)),pow(p_3d->matched_ratio_,2)*6+2,cv::Scalar(0,255,0),1);
     }
    //  cv::imshow("Depth",img_depth);
-    cv::imshow("Features",img_show);
    
-  
+    cv::String show_fps(string("FPS:")+to_string(1/cost_time));
+    cv::String show_map_points(string("MapPoints:")+to_string(vo->map_->map_points_.size()));
+    cv::putText(img_show, show_fps, cv::Point2i(5,img_show.rows-10), cv::FONT_HERSHEY_PLAIN, 1.5, cv::Scalar(0,255,0), 1);
+    cv::putText(img_show, show_map_points, cv::Point2i(img_show.cols/2+5,img_show.rows-10), cv::FONT_HERSHEY_PLAIN, 1.5, cv::Scalar(0,255,0), 1);
+    cv::imshow("Features",img_show);  
+    
       Eigen::Matrix4d T_show;
       
       T_show = T_cw_m.inverse();

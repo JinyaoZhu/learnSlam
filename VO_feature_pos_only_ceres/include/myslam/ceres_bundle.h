@@ -47,10 +47,13 @@ public:
 	      
       Eigen::Matrix<T,3,1> p_cam = angle_axis*p_world + V*upsilon;
 
+      p_cam(0) /= p_cam(2);
+      p_cam(1) /= p_cam(2);
+          
       Eigen::Matrix<T,2,1> p_pixel;
-
-      p_pixel(0) = p_cam(0)*T(K_(0,0))/p_cam(2) + T(K_(0,2));
-      p_pixel(1) = p_cam(1)*T(K_(1,1))/p_cam(2) + T(K_(1,2));
+      
+      p_pixel(0) = p_cam(0)*T(K_(0,0)) + T(K_(0,2));
+      p_pixel(1) = p_cam(1)*T(K_(1,1)) + T(K_(1,2));
 	      
       residual[0] = T(observe_(0)) - p_pixel(0);
       residual[1] = T(observe_(1)) - p_pixel(1);
@@ -69,9 +72,8 @@ private:
 
 
 
-void ceresBundle(vector<Eigen::Vector3d> &p3d,vector<Eigen::Vector2d> &p2d,Eigen::Matrix3d &K,Eigen::Matrix<double,6,1> &se3);
-
-
+void ceresBundle(vector<Eigen::Vector3d> &p3d,vector<Eigen::Vector2d> &p2d,
+		 const Eigen::Matrix3d &K,Eigen::Matrix<double,6,1> &se3);
 
 
 
